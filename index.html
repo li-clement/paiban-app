@@ -229,28 +229,50 @@ function queryPerson() {
 }
 
 // ========== 分享：名单+参数压缩进URL，生成二维码 ==========
-function makeShare() {
+async function makeShare() {
   if (!state) { showToast('请先生成排班表'); return; }
   const payload = {
     m: state.maleNames, f: state.femaleNames,
     w: state.workDays, d: state.perDay
   };
   const data = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-  const url = location.origin + location.pathname + '#p=' + data;
-  document.getElementById('shareLink').textContent = url;
-  document.getElementById('qrcode').innerHTML = '';
+  const longUrl = location.origin + location.pathname + '?p=' + data;
+  const linkEl = document.getElementById('shareLink');
+  const qrEl = document.getElementById('qrcode');
+  linkEl.textContent = longUrl;
+  qrEl.innerHTML = '<p style="color:#9aa5b1;font-size:13px;">正在生成短链，请稍候…</p>';
   document.getElementById('shareCard').classList.remove('hidden');
+
+  // 1) 尝试用 tinyurl 缩短链接 -> 二维码稀疏可扫
+  let qrText = longUrl;
   try {
-    new QRCode(document.getElementById('qrcode'), { text: url, width: 200, height: 200 });
+    const r = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl));
+    if (r.ok) {
+      const s = (await r.text()).trim();
+      if (/^https?:\/\//.test(s)) { qrText = s; linkEl.textContent = s; }
+    }
+  } catch (e) { /* 网络失败则退回长链接 */ }
+
+  // 2) 生成二维码：低纠错级别+放大+白色边距
+  qrEl.innerHTML = '';
+  try {
+    const qr = new QRCode(qrEl, {
+      text: qrText, width: 320, height: 320,
+      correctLevel: QRCode.CorrectLevel.L,
+      colorDark: '#1f2933', colorLight: '#ffffff'
+    });
+    // 加白色边距，提升识别率
+    const img = qrEl.querySelector('img,canvas');
+    if (img) img.style.padding = '14px'; img.style.background = '#fff';
   } catch (e) {
-    document.getElementById('qrcode').innerHTML = '<p style="color:#c00;font-size:13px;">二维码库加载失败，可直接复制下方链接分享。</p>';
+    qrEl.innerHTML = '<p style="color:#c00;font-size:13px;">二维码生成失败，请直接复制下方链接分享。</p>';
   }
   document.getElementById('shareCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-// 打开链接时若有数据自动恢复并生成
+// 打开链接时若有数据自动恢复并生成（支持 ?p= 和 #p= 两种形式）
 function loadFromUrl() {
-  const m = location.hash.match(/#p=([\s\S]+)/);
+  const m = location.search.match(/[?&]p=([\s\S]+)/) || location.hash.match(/[#&]p=([\s\S]+)/);
   if (!m) return;
   try {
     const p = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
