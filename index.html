@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>均衡排班助手</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#f4f6fa; color:#1f2933; padding-bottom:80px; }
+  .topbar { background:linear-gradient(135deg,#4f6df5,#7c5cf5); color:#fff; padding:20px 18px 26px; }
+  .topbar h1 { font-size:22px; font-weight:700; }
+  .topbar p { font-size:13px; opacity:.85; margin-top:4px; }
+  .card { background:#fff; border-radius:14px; margin:14px; padding:16px 16px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .card h2 { font-size:15px; margin-bottom:12px; color:#4f6df5; display:flex; align-items:center; gap:6px; }
+  .card h2::before { content:""; width:4px; height:16px; background:#4f6df5; border-radius:2px; }
+  label { font-size:13px; color:#52606d; display:block; margin-bottom:5px; }
+  input, textarea, select { width:100%; padding:10px 12px; border:1px solid #d9e2ec; border-radius:9px; font-size:15px; background:#fbfcfe; outline:none; }
+  input:focus, textarea:focus { border-color:#4f6df5; background:#fff; }
+  textarea { min-height:110px; resize:vertical; font-family:inherit; }
+  .row { display:flex; gap:12px; }
+  .row > div { flex:1; }
+  .hint { font-size:12px; color:#9aa5b1; margin-top:6px; }
+  .btn { display:block; width:100%; padding:14px; border:none; border-radius:11px; font-size:16px; font-weight:600; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#4f6df5,#7c5cf5); color:#fff; }
+  .btn-primary:active { transform:scale(.98); }
+  .btn-ghost { background:#eef1ff; color:#4f6df5; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; text-align:center; margin-top:6px; }
+  .stat { background:#f0f4ff; border-radius:10px; padding:10px 4px; }
+  .stat b { font-size:18px; color:#4f6df5; display:block; }
+  .stat span { font-size:11px; color:#52606d; }
+  .day { border:1px solid #e4e9f0; border-radius:11px; margin-bottom:12px; overflow:hidden; }
+  .day-head { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#f7f9fd; }
+  .day-head b { font-size:15px; }
+  .day-head small { color:#7b8794; }
+  .day-body { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; }
+  .grp { background:#f7f9fd; border-radius:9px; padding:9px; }
+  .grp.t { border-top:3px solid #4f6df5; }
+  .grp.f { border-top:3px solid #f59e0b; }
+  .grp-label { font-size:12px; font-weight:700; margin-bottom:6px; color:#52606d; }
+  .grp.t .grp-label { color:#4f6df5; }
+  .grp.f .grp-label { color:#d97706; }
+  .grp-count { font-weight:600; }
+  .grp-list { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { background:#fff; border:1px solid #e4e9f0; border-radius:20px; padding:4px 10px; font-size:13px; }
+  .grp.t .chip { color:#4f6df5; border-color:#c9d6ff; background:#f4f7ff; }
+  .grp.f .chip { color:#d97706; border-color:#fde9c8; background:#fffaf0; }
+  .legend { display:flex; gap:14px; font-size:12px; color:#52606d; margin-bottom:12px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+  .search-box { position:relative; }
+  .result-chip { margin-top:12px; padding:10px; border-radius:9px; background:#f0f4ff; font-size:14px; }
+  .result-chip b { color:#4f6df5; }
+  .share-grid { display:flex; flex-direction:column; align-items:center; }
+  #qrcode { background:#fff; padding:10px; border-radius:10px; }
+  .share-note { font-size:12px; color:#9aa5b1; text-align:center; margin-top:8px; line-height:1.6; }
+  .linkbox { width:100%; font-size:11px; color:#7b8794; word-break:break-all; margin-top:8px; padding:8px; background:#f7f9fd; border-radius:8px; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tab { flex:1; text-align:center; padding:8px; border-radius:9px; background:#eef1ff; color:#4f6df5; font-size:14px; font-weight:600; cursor:pointer; }
+  .tab.on { background:#4f6df5; color:#fff; }
+  .hidden { display:none; }
+  .toast { position:fixed; left:50%; bottom:30px; transform:translateX(-50%); background:rgba(31,41,51,.9); color:#fff; padding:10px 18px; border-radius:9px; font-size:14px; z-index:99; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>均衡排班助手</h1>
+  <p>男女均衡 · 班次公平 · 一周排班</p>
+</div>
+
+<!-- 配置区 -->
+<div class="card" id="configCard">
+  <h2>名单设置</h2>
+  <div class="row" style="margin-bottom:12px;">
+    <div>
+      <label>男生人数</label>
+      <input type="number" id="maleCount" value="50" min="1">
+    </div>
+    <div>
+      <label>女生人数</label>
+      <input type="number" id="femaleCount" value="50" min="1">
+    </div>
+  </div>
+  <label>男生名单（每行一个名字，留空则自动生成）</label>
+  <textarea id="maleNames" placeholder="张三&#10;李四&#10;..."></textarea>
+  <label style="margin-top:10px;">女生名单（每行一个名字）</label>
+  <textarea id="femaleNames" placeholder="王芳&#10;刘敏&#10;..."></textarea>
+
+  <h2 style="margin-top:18px;">排班参数</h2>
+  <div class="row">
+    <div>
+      <label>每周上班几天</label>
+      <input type="number" id="workDays" value="7" min="1" max="7">
+    </div>
+    <div>
+      <label>每天上班人数</label>
+      <input type="number" id="perDay" value="20" min="1">
+    </div>
+  </div>
+  <div class="hint" id="cfgHint">建议：每天人数不超过总人数，且最好是偶数以保持男女严格均衡。</div>
+
+  <button class="btn btn-primary" id="genBtn" style="margin-top:14px;">生成排班表</button>
+  <button class="btn btn-ghost" id="shareBtn" style="margin-top:10px;">📱 生成分享二维码</button>
+</div>
+
+<!-- 结果区 -->
+<div class="card hidden" id="resultCard">
+  <div class="tabs">
+    <div class="tab on" data-tab="week">📅 排班表</div>
+    <div class="tab" data-tab="person">👤 个人查询</div>
+  </div>
+  <div id="weekPanel">
+    <div class="stats" id="stats"></div>
+    <div style="margin-top:14px;">
+      <div class="legend"><span><i style="background:#4f6df5"></i>男生</span><span><i style="background:#f59e0b"></i>女生</span></div>
+      <div id="schedule"></div>
+    </div>
+  </div>
+  <div id="personPanel" class="hidden">
+    <div class="search-box">
+      <input id="personInput" placeholder="输入名字查询本周班次">
+    </div>
+    <div id="personResult"></div>
+  </div>
+</div>
+
+<div class="card hidden" id="shareCard">
+  <h2>分享排班</h2>
+  <div class="share-grid">
+    <div id="qrcode"></div>
+    <p class="share-note">扫码即可在手机上查看这份排班表。<br>把链接发给同事，大家看到的是同一份排班。</p>
+    <div class="linkbox" id="shareLink"></div>
+  </div>
+</div>
+
+<script>
+// ========== 排班核心算法 ==========
+function generateSchedule(maleNames, femaleNames, workDays, perDay) {
+  const males = maleNames.map(n => ({ name: n, count: 0, days: [] }));
+  const females = femaleNames.map(n => ({ name: n, count: 0, days: [] }));
+  const malePerDay = Math.floor(perDay / 2);
+  const femalePerDay = perDay - malePerDay;
+  const days = [];
+  for (let d = 0; d < workDays; d++) {
+    const score = p => {
+      const last = p.days.length ? p.days[p.days.length - 1] : -999;
+      const gap = d - last;
+      return p.count * 100 + (gap > 3 ? 0 : (3 - gap) * 10);
+    };
+    males.sort((a, b) => score(a) - score(b));
+    females.sort((a, b) => score(a) - score(b));
+    const chosenM = males.slice(0, malePerDay).map(p => { p.count++; p.days.push(d); return p.name; });
+    const chosenF = females.slice(0, femalePerDay).map(p => { p.count++; p.days.push(d); return p.name; });
+    days.push({ chosenM, chosenF });
+  }
+  return { days, males, females };
+}
+
+const WEEK = ['周一','周二','周三','周四','周五','周六','周日'];
+
+function parseNames(text, count, prefix) {
+  const lines = text.split(/[\n,，]/).map(s => s.trim()).filter(Boolean);
+  if (lines.length > 0) return lines;
+  return Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+}
+
+let state = null;
+
+function generate() {
+  const maleCount = Math.max(1, parseInt(document.getElementById('maleCount').value) || 50);
+  const femaleCount = Math.max(1, parseInt(document.getElementById('femaleCount').value) || 50);
+  const workDays = Math.min(7, Math.max(1, parseInt(document.getElementById('workDays').value) || 7));
+  let perDay = parseInt(document.getElementById('perDay').value) || 20;
+  perDay = Math.min(perDay, maleCount + femaleCount);
+  perDay = Math.max(1, perDay);
+  document.getElementById('perDay').value = perDay;
+
+  const maleNames = parseNames(document.getElementById('maleNames').value, maleCount, '男');
+  const femaleNames = parseNames(document.getElementById('femaleNames').value, femaleCount, '女');
+
+  state = { maleNames, femaleNames, workDays, perDay };
+  const { days, males, females } = generateSchedule(maleNames, femaleNames, workDays, perDay);
+  state.days = days; state.people = [...males, ...females];
+
+  renderWeek(days, maleNames, femaleNames, workDays, perDay);
+  renderStats(days, perDay);
+
+  document.getElementById('resultCard').classList.remove('hidden');
+  document.getElementById('shareCard').classList.add('hidden');
+  document.getElementById('configCard').scrollIntoView({ behavior:'smooth' });
+  showToast('排班已生成');
+}
+
+function renderStats(days, perDay) {
+  const all = state.people;
+  const counts = all.map(p => p.count);
+  const total = counts.reduce((a, b) => a + b, 0);
+  const each = (total / all.length).toFixed(1);
+  const spread = Math.max(...counts) - Math.min(...counts);
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><b>${total}</b><span>本周总班次</span></div>
+     <div class="stat"><b>${each}</b><span>人均班次</span></div>
+     <div class="stat"><b>${spread}</b><span>公平性(极差)</span></div>`;
+}
+
+function renderWeek(days, maleNames, femaleNames, workDays, perDay) {
+  const el = document.getElementById('schedule');
+  let html = '';
+  for (let d = 0; d < workDays; d++) {
+    const day = days[d];
+    html += `<div class="day">
+      <div class="day-head"><b>${WEEK[d]}</b><small>男 ${day.chosenM.length} 人 · 女 ${day.chosenF.length} 人 · 共 ${day.chosenM.length + day.chosenF.length} 人</small></div>
+      <div class="day-body">
+        <div class="grp t"><div class="grp-label">男生 <span class="grp-count">(${day.chosenM.length})</span></div><div class="grp-list">${day.chosenM.map(n => `<span class="chip">${n}</span>`).join('')}</div></div>
+        <div class="grp f"><div class="grp-label">女生 <span class="grp-count">(${day.chosenF.length})</span></div><div class="grp-list">${day.chosenF.map(n => `<span class="chip">${n}</span>`).join('')}</div></div>
+      </div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// 个人查询
+function queryPerson() {
+  const name = document.getElementById('personInput').value.trim();
+  const res = document.getElementById('personResult');
+  if (!name) { res.innerHTML = ''; return; }
+  const p = (state.people || []).find(x => x.name === name);
+  if (!p) { res.innerHTML = `<div class="result-chip">未找到「${name}」，请检查名单。</div>`; return; }
+  const myDays = p.days.map(d => WEEK[d]).join('、') || '（本周无需上班）';
+  const gender = state.maleNames.includes(name) ? '男生' : '女生';
+  res.innerHTML = `<div class="result-chip">「<b>${name}</b>」（${gender}）本周上班 ${p.count} 次：<b>${myDays}</b></div>`;
+}
+
+// ========== 分享：名单+参数压缩进URL，生成二维码 ==========
+function makeShare() {
+  if (!state) { showToast('请先生成排班表'); return; }
+  const payload = {
+    m: state.maleNames, f: state.femaleNames,
+    w: state.workDays, d: state.perDay
+  };
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = location.origin + location.pathname + '#p=' + data;
+  document.getElementById('shareLink').textContent = url;
+  document.getElementById('qrcode').innerHTML = '';
+  document.getElementById('shareCard').classList.remove('hidden');
+  try {
+    new QRCode(document.getElementById('qrcode'), { text: url, width: 200, height: 200 });
+  } catch (e) {
+    document.getElementById('qrcode').innerHTML = '<p style="color:#c00;font-size:13px;">二维码库加载失败，可直接复制下方链接分享。</p>';
+  }
+  document.getElementById('shareCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+// 打开链接时若有数据自动恢复并生成
+function loadFromUrl() {
+  const m = location.hash.match(/#p=([\s\S]+)/);
+  if (!m) return;
+  try {
+    const p = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    document.getElementById('maleCount').value = p.m.length;
+    document.getElementById('femaleCount').value = p.f.length;
+    document.getElementById('maleNames').value = p.m.join('\n');
+    document.getElementById('femaleNames').value = p.f.join('\n');
+    document.getElementById('workDays').value = p.w;
+    document.getElementById('perDay').value = p.d;
+    generate();
+  } catch (e) { console.error('恢复失败', e); }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+// 事件绑定
+document.getElementById('genBtn').addEventListener('click', generate);
+document.getElementById('shareBtn').addEventListener('click', makeShare);
+document.getElementById('personInput').addEventListener('input', queryPerson);
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  const isWeek = t.dataset.tab === 'week';
+  document.getElementById('weekPanel').classList.toggle('hidden', !isWeek);
+  document.getElementById('personPanel').classList.toggle('hidden', isWeek);
+}));
+// 输入框变化时提示
+['maleCount','femaleCount','workDays','perDay'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    const m = +document.getElementById('maleCount').value;
+    const f = +document.getElementById('femaleCount').value;
+    const per = +document.getElementById('perDay').value;
+    const h = document.getElementById('cfgHint');
+    h.textContent = per % 2 !== 0 ? '提示：每天人数为奇数时，男女无法完全相等，会轮流多排一方。'
+      : per > m + f ? '提示：每天人数超过总人数，会有人重复上班。'
+      : '建议：每天人数不超过总人数，且最好是偶数以保持男女严格均衡。';
+  });
+});
+
+// 加载外部二维码库（若可用）
+const qrScript = document.createElement('script');
+qrScript.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+document.head.appendChild(qrScript);
+
+loadFromUrl();
+</script>
+</body>
+</html>
